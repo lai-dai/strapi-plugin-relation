@@ -1,0 +1,10 @@
+{
+  "settings.button-choose": "Choose",
+  "settings.modal-button-close": "Close",
+  "settings.modal-button-confirm": "OK",
+  "settings.modal-title": "Add Entry",
+  "settings.search-input-placeholder": "Search",
+  "settings.data-empty": "Empty Data",
+  "settings.loading": "Loading",
+  "settings.error": "Error"
+}
