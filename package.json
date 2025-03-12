@@ -1,5 +1,5 @@
 {
-  "version": "0.0.0",
+  "version": "1.0.0",
   "keywords": [],
   "type": "commonjs",
   "exports": {
@@ -73,5 +73,12 @@
     "url": "https://github.com/lai-dai/strapi-plugin-relation/issues"
   },
   "homepage": "https://github.com/lai-dai/strapi-plugin-relation#readme",
-  "author": "laidai <laidai9966@gmail.com>"
+  "author": "laidai <laidai9966@gmail.com>",
+  "maintainers": [
+    {
+      "name": "Strapi Solutions SAS",
+      "email": "hi@strapi.io",
+      "url": "https://strapi.io"
+    }
+  ]
 }
