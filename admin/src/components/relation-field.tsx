@@ -15,7 +15,7 @@ import { SearchForm } from '@strapi/design-system';
 import { Searchbar } from '@strapi/design-system';
 import { useIntl } from 'react-intl';
 import { Plus } from '@strapi/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { getTranslation } from '../utils/getTranslation';
 import { BaseResult, Pagination } from '../types/shared';
 import { RelationResult as RelResult } from '../types/relations';
@@ -89,6 +89,7 @@ export const MyInputField = (props: InputFieldProps) => {
   const navigate = useNavigate();
   const { put } = useFetchClient();
   const { toggleNotification } = useNotification();
+  const location = useLocation();
 
   const [relationConnects, setRelationConnect] = React.useState<RelationConnects[]>([]);
 
@@ -127,7 +128,11 @@ export const MyInputField = (props: InputFieldProps) => {
         <Modal.Root>
           <Box>
             <Modal.Trigger>
-              <Button variant={'secondary'} style={{ height: '3.7rem' }}>
+              <Button
+                disabled={location.pathname.endsWith('/create')}
+                variant={'secondary'}
+                style={{ height: '3.7rem' }}
+              >
                 <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <Plus />
 
@@ -209,6 +214,7 @@ const ModalContent = (
         page: 1,
       },
     },
+    initialEnabled: !!ctx.id,
   });
 
   if (status === 'pending') {
@@ -277,6 +283,7 @@ function ListCheckboxField(
     cache: {
       ttl: 0,
     },
+    initialEnabled: !!ctx.id,
   });
 
   const handleCheckedChange = React.useCallback(
