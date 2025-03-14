@@ -1,1 +1,1 @@
-export const PLUGIN_ID = 'relation';
+export const PLUGIN_ID = 'strapi-plugin-relation';

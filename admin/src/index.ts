@@ -27,16 +27,16 @@ export default {
     });
 
     app.customFields.register({
-      name: 'relation',
+      name: 'strapi-plugin-relation',
       pluginId: PLUGIN_ID,
       type: 'json',
       intlLabel: {
         id: getTranslation('settings.title'),
-        defaultMessage: 'Target',
+        defaultMessage: 'Choose Relation Field',
       },
       intlDescription: {
         id: getTranslation('settings.description'),
-        defaultMessage: 'Target Relation',
+        defaultMessage: 'Choose Relation Field',
       },
       icon: PluginIcon,
       components: {

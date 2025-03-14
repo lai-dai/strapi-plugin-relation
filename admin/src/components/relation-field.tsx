@@ -25,7 +25,7 @@ import { debounce } from '../utils/debounce';
 import { useCallbackRef } from '../hooks/use-callback-ref';
 import useFetch from '../hooks/use-fetch';
 import { getRelationLabel } from '../utils/relations';
-
+import { ChevronRight, ChevronLeft } from '@strapi/icons';
 interface RelationResult extends RelResult {
   __temp_key__: string;
 }
@@ -250,6 +250,7 @@ function ListCheckboxField(
   const { target_name: targetName, parent_name: parentName } = attribute.options;
 
   const [search, setSearch] = React.useState('');
+  const [page, setPage] = React.useState(1);
 
   const { formatMessage } = useIntl();
   const ctx = useContentManagerContext();
@@ -263,14 +264,14 @@ function ListCheckboxField(
     pagination: Pagination;
     results: BaseResult[];
   }>({
-    key: ['relations-target', ctx.model, targetName, search, parentId, parentName],
+    key: ['relations-target', ctx.model, targetName, search, parentId, parentName, page],
     url: `/content-manager/relations/${ctx.model}/${targetName}`,
     config: {
       params: {
         id: ctx.isSingleType ? undefined : ctx.id,
         pageSize: 10,
         _q: search,
-        page: 1,
+        page: page,
         filters: {
           [parentName]: {
             $eq: parentId,
@@ -286,8 +287,31 @@ function ListCheckboxField(
     initialEnabled: !!ctx.id,
   });
 
+  const toOneRelation = [
+    'oneWay',
+    'oneToOne',
+    'manyToOne',
+    'oneToManyMorph',
+    'oneToOneMorph',
+  ].includes(
+    (ctx.contentType?.attributes?.[targetName] as unknown as Record<string, string>)?.relationType
+  );
+
   const handleCheckedChange = React.useCallback(
     (checked: boolean, relation: BaseResult) => {
+      if (toOneRelation) {
+        if (checked) {
+          const item = {
+            id: relation.id,
+            documentId: relation.documentId,
+          };
+          setRelationConnect([item]);
+        } else {
+          setRelationConnect([]);
+        }
+        return;
+      }
+
       let result = [...relationConnects];
 
       if (checked) {
@@ -327,27 +351,67 @@ function ListCheckboxField(
           defaultMessage: 'Error',
         }))
       ) : data?.results.length ? (
-        <div
-          style={{
-            display: 'grid',
-            gap: '24px',
-            gridTemplateColumns: 'repeat(3,minmax(0,1fr))',
-          }}
-        >
-          {data?.results?.map((relation) => (
-            <Entry key={relation.id}>
-              <Checkbox
-                checked={relationConnects.some((it) => it.id === relation.id)}
-                onCheckedChange={(checked: boolean) => {
-                  handleCheckedChange(checked, relation);
-                }}
-              >
-                {getRelationLabel(relation, { name: mainFieldRef.current })}
+        <div>
+          <div
+            style={{
+              display: 'grid',
+              gap: '24px',
+              gridTemplateColumns: 'repeat(3,minmax(0,1fr))',
+            }}
+          >
+            {data?.results?.map((relation) => (
+              <Entry key={relation.id}>
+                <Checkbox
+                  checked={relationConnects.some((it) => it.id === relation.id)}
+                  onCheckedChange={(checked: boolean) => {
+                    handleCheckedChange(checked, relation);
+                  }}
+                >
+                  {getRelationLabel(relation, { name: mainFieldRef.current })}
 
-                {relation.status ? <DocumentStatus status={relation.status as string} /> : null}
-              </Checkbox>
-            </Entry>
-          ))}
+                  {relation.status ? <DocumentStatus status={relation.status as string} /> : null}
+                </Checkbox>
+              </Entry>
+            ))}
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: '6px',
+              alignItems: 'center',
+              marginTop: '12px',
+            }}
+          >
+            <Button
+              onClick={() => {
+                setPage(page - 1);
+              }}
+              disabled={page <= 1}
+              variant="ghost"
+              style={{
+                padding: '0.7rem',
+              }}
+            >
+              <ChevronLeft />
+            </Button>
+
+            <div style={{ padding: '4px' }}>{page}</div>
+
+            <Button
+              onClick={() => {
+                setPage(page + 1);
+              }}
+              disabled={data.pagination.page >= data.pagination.pageCount}
+              variant="ghost"
+              style={{
+                padding: '0.7rem',
+              }}
+            >
+              <ChevronRight />
+            </Button>
+          </div>
         </div>
       ) : (
         <div style={{ textAlign: 'center' }}>
