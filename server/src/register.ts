@@ -9,7 +9,7 @@ const register = ({ strapi }: { strapi: Core.Strapi }) => {
     type: 'json', // The data type stored in the database
     inputSize: {
       default: 6,
-      isResizable: false,
+      isResizable: true,
     },
   });
 };

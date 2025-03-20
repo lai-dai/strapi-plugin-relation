@@ -55,6 +55,7 @@ interface InputFieldProps {
     options: {
       parent_name: string;
       target_name: string;
+      target_input_hidden: boolean;
     };
   };
   disabled: false;
@@ -126,7 +127,7 @@ function useHandleDisconnect(fieldName: string, consumerName: string) {
 
 export const _MyInputField = (props: InputFieldProps) => {
   const { label, required, hint, error } = props;
-  const { target_name: targetName } = props.attribute.options;
+  const { target_name: targetName, target_input_hidden } = props.attribute.options;
 
   const ctx = useContentManagerContext();
   const { formatMessage } = useIntl();
@@ -147,6 +148,22 @@ export const _MyInputField = (props: InputFieldProps) => {
 
   const [relationConnects, setRelationConnect] = React.useState<RelationConnects[]>([]);
 
+  const buttonRef = React.useRef<HTMLButtonElement>(null);
+
+  React.useEffect(() => {
+    if (target_input_hidden) {
+      const inputEl = document.querySelector(`input[name="${targetName}"]`) as HTMLInputElement;
+
+      if (inputEl) {
+        const parent = inputEl.parentNode?.parentNode as HTMLDivElement;
+
+        if (parent) {
+          parent.style.display = 'none';
+        }
+      }
+    }
+  }, [target_input_hidden]);
+
   const { data } = useFetch({
     key: ['one-relation', toOneRelationRef.current, ctx.model, ctx.id, targetName],
     url: `/content-manager/relations/${ctx.model}/${ctx.id}/${targetName}`,
@@ -158,7 +175,7 @@ export const _MyInputField = (props: InputFieldProps) => {
     },
     initialEnabled: toOneRelationRef.current,
   });
-  console.log('🚀 data', data);
+
   const handleConnect: RelationsInputProps['onChange'] = React.useCallback(
     (relation) => {
       const item = {
@@ -209,9 +226,9 @@ export const _MyInputField = (props: InputFieldProps) => {
         {label ? <Field.Label>{label}</Field.Label> : null}
 
         <Modal.Root>
-          <Box>
+          <Box paddingTop={target_input_hidden ? '12px' : undefined}>
             <Modal.Trigger>
-              <Button variant={'secondary'} style={{ height: '3.7rem' }}>
+              <Button ref={buttonRef} variant={'secondary'} style={{ height: '3.7rem' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <Plus />
 

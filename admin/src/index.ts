@@ -50,7 +50,7 @@ export default {
           {
             intlLabel: {
               id: getTranslation('settings.title'),
-              defaultMessage: 'Target Relation',
+              defaultMessage: 'Target Name',
             },
             intlDescription: {
               id: getTranslation('settings.description'),
@@ -62,7 +62,7 @@ export default {
           {
             intlLabel: {
               id: getTranslation('settings.title'),
-              defaultMessage: 'Relation Parent',
+              defaultMessage: 'Parent Name',
             },
             intlDescription: {
               id: getTranslation('settings.description'),
@@ -70,6 +70,18 @@ export default {
             },
             name: 'options.parent_name',
             type: 'text',
+          },
+          {
+            intlLabel: {
+              id: getTranslation('settings.title'),
+              defaultMessage: 'Target Input Hidden',
+            },
+            intlDescription: {
+              id: getTranslation('settings.description'),
+              defaultMessage: 'Hidden Your Relation',
+            },
+            name: 'options.target_input_hidden',
+            type: 'checkbox',
           },
         ],
       },
