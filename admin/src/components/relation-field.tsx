@@ -1,22 +1,16 @@
 import React from 'react';
 import {
+  Filters,
+  InputProps,
   unstable_useContentManagerContext as useContentManagerContext,
-  useFetchClient,
   useField,
-  useNotification,
+  useForm,
 } from '@strapi/strapi/admin';
-import { Box } from '@strapi/design-system';
-import { Modal } from '@strapi/design-system';
-import { Field } from '@strapi/design-system';
-import { Button } from '@strapi/design-system';
-import { Checkbox } from '@strapi/design-system';
 import { styled } from 'styled-components';
-import { SearchForm } from '@strapi/design-system';
-import { Searchbar } from '@strapi/design-system';
+import { Box, Modal, Field, Button, Checkbox, SearchForm, Searchbar } from '@strapi/design-system';
+
 import { useIntl } from 'react-intl';
 import { Plus } from '@strapi/icons';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { getTranslation } from '../utils/getTranslation';
 import { BaseResult, Pagination } from '../types/shared';
 import { RelationResult as RelResult } from '../types/relations';
 import { CacheProvider } from '../components/cache-provider';
@@ -26,6 +20,11 @@ import { useCallbackRef } from '../hooks/use-callback-ref';
 import useFetch from '../hooks/use-fetch';
 import { getRelationLabel } from '../utils/relations';
 import { ChevronRight, ChevronLeft } from '@strapi/icons';
+import type { Schema as SchemaUtils } from '@strapi/types';
+import { generateNKeysBetween } from 'fractional-indexing';
+
+const COLLECTION_TYPES = 'collection-types';
+
 interface RelationResult extends RelResult {
   __temp_key__: string;
 }
@@ -80,59 +79,139 @@ type RelationConnects = {
   documentId: string;
 };
 
+const ONE_WAY_RELATIONS = ['oneWay', 'oneToOne', 'manyToOne', 'oneToManyMorph', 'oneToOneMorph'];
+
 export const MyInputField = (props: InputFieldProps) => {
+  return (
+    <CacheProvider>
+      <_MyInputField {...props} />
+    </CacheProvider>
+  );
+};
+
+function useHandleDisconnect(fieldName: string, consumerName: string) {
+  const field = useField(fieldName);
+  const removeFieldRow = useForm(consumerName, (state) => state.removeFieldRow);
+  const addFieldRow = useForm(consumerName, (state) => state.addFieldRow);
+
+  const handleDisconnect: (relation: Relation) => void = (relation) => {
+    if (field.value && field.value.connect) {
+      /**
+       * A relation will exist in the `connect` array _if_ it has
+       * been added without saving. In this case, we just remove it
+       * from the connect array
+       */
+      const indexOfRelationInConnectArray = field.value.connect.findIndex(
+        (rel: NonNullable<RelationsFormValue['connect']>[number]) => rel.id === relation.id
+      );
+
+      if (indexOfRelationInConnectArray >= 0) {
+        removeFieldRow(`${fieldName}.connect`, indexOfRelationInConnectArray);
+        return;
+      }
+    }
+
+    addFieldRow(`${fieldName}.disconnect`, {
+      id: relation.id,
+      apiData: {
+        id: relation.id,
+        documentId: relation.documentId,
+        locale: relation.locale,
+      },
+    });
+  };
+
+  return handleDisconnect;
+}
+
+export const _MyInputField = (props: InputFieldProps) => {
   const { label, required, hint, error } = props;
   const { target_name: targetName } = props.attribute.options;
 
   const ctx = useContentManagerContext();
   const { formatMessage } = useIntl();
-  const navigate = useNavigate();
-  const { put } = useFetchClient();
-  const { toggleNotification } = useNotification();
-  const location = useLocation();
+  const targetField = useField(targetName);
+
+  const addFieldRow = useForm('RelationsList', (state) => state.addFieldRow);
+  const handleDisconnect = useHandleDisconnect(targetName, 'RelationsField');
+
+  const mainFieldRef = React.useRef(
+    (ctx.layout.edit.metadatas[targetName] as { mainField: Pick<RelationsFieldProps, 'mainField'> })
+      .mainField
+  );
+  const toOneRelationRef = React.useRef(
+    ONE_WAY_RELATIONS.includes(
+      (ctx.contentType?.attributes?.[targetName] as unknown as Record<string, string>)?.relationType
+    )
+  );
 
   const [relationConnects, setRelationConnect] = React.useState<RelationConnects[]>([]);
 
-  const handleSubmit = React.useCallback(async () => {
-    try {
-      if (relationConnects.length) {
-        await put(`/content-manager/collection-types/${ctx.model}/${ctx.id}`, {
-          [targetName]: {
-            connect: relationConnects,
-            disconnect: [],
-          },
-        });
+  const { data } = useFetch({
+    key: ['one-relation', toOneRelationRef.current, ctx.model, ctx.id, targetName],
+    url: `/content-manager/relations/${ctx.model}/${ctx.id}/${targetName}`,
+    config: {
+      params: {
+        pageSize: 1,
+        page: 1,
+      },
+    },
+    initialEnabled: toOneRelationRef.current,
+  });
+  console.log('🚀 data', data);
+  const handleConnect: RelationsInputProps['onChange'] = React.useCallback(
+    (relation) => {
+      const item = {
+        id: relation.id,
+        apiData: {
+          id: relation.id,
+          documentId: relation.documentId,
+          locale: relation.locale,
+        },
+        status: relation.status,
+        /**
+         * If there's a last item, that's the first key we use to generate out next one.
+         */
+        __temp_key__: generateNKeysBetween(null, null, 1)[0],
+        // Fallback to `id` if there is no `mainField` value, which will overwrite the above `id` property with the exact same data.
+        [(mainFieldRef.current ?? 'documentId') as string]:
+          relation[(mainFieldRef.current ?? 'documentId') as string],
+        label: getRelationLabel(relation, { name: mainFieldRef.current as string }),
+        href: `../${COLLECTION_TYPES}/${ctx.model}/${relation.documentId}?${relation.locale ? `plugins[i18n][locale]=${relation.locale}` : ''}`,
+      };
 
-        // vì hiện tại chưa thể set field relation được
-        // refresh
-        navigate(0);
+      if (toOneRelationRef.current) {
+        targetField.value?.connect?.forEach(handleDisconnect);
+
+        data?.results?.forEach(handleDisconnect);
       }
-    } catch (error) {
-      toggleNotification({
-        message: formatMessage({
-          id: getTranslation('relation.error-adding-relation'),
-          defaultMessage: 'An error occurred while trying to add the relation.',
-          description: (error as Error)?.message ?? '',
-        }),
-        type: 'danger',
-      });
-      console.log('🚀 error', error);
+
+      addFieldRow(`${targetName}.connect`, item);
+
+      setRelationConnect([]);
+    },
+    [targetName, data?.results, targetField.value]
+  );
+
+  const handleSubmit = React.useCallback(async () => {
+    if (!relationConnects.length) {
+      return;
     }
-  }, [relationConnects, targetName, ctx.model, ctx.id]);
+
+    relationConnects.forEach((it) => {
+      handleConnect(it);
+    });
+  }, [relationConnects]);
 
   return (
-    <Field.Root hint={hint} error={error} required={required}>
-      {label ? <Field.Label>{label}</Field.Label> : null}
+    <div>
+      <Field.Root hint={hint} error={error} required={required}>
+        {label ? <Field.Label>{label}</Field.Label> : null}
 
-      <CacheProvider>
         <Modal.Root>
           <Box>
             <Modal.Trigger>
-              <Button
-                disabled={location.pathname.endsWith('/create')}
-                variant={'secondary'}
-                style={{ height: '3.7rem' }}
-              >
+              <Button variant={'secondary'} style={{ height: '3.7rem' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <Plus />
 
@@ -181,11 +260,11 @@ export const MyInputField = (props: InputFieldProps) => {
             </Modal.Footer>
           </Modal.Content>
         </Modal.Root>
-      </CacheProvider>
 
-      <Field.Error />
-      <Field.Hint />
-    </Field.Root>
+        <Field.Error />
+        <Field.Hint />
+      </Field.Root>
+    </div>
   );
 };
 
@@ -287,13 +366,7 @@ function ListCheckboxField(
     initialEnabled: !!ctx.id,
   });
 
-  const toOneRelation = [
-    'oneWay',
-    'oneToOne',
-    'manyToOne',
-    'oneToManyMorph',
-    'oneToOneMorph',
-  ].includes(
+  const toOneRelation = ONE_WAY_RELATIONS.includes(
     (ctx.contentType?.attributes?.[targetName] as unknown as Record<string, string>)?.relationType
   );
 
@@ -301,11 +374,7 @@ function ListCheckboxField(
     (checked: boolean, relation: BaseResult) => {
       if (toOneRelation) {
         if (checked) {
-          const item = {
-            id: relation.id,
-            documentId: relation.documentId,
-          };
-          setRelationConnect([item]);
+          setRelationConnect([relation]);
         } else {
           setRelationConnect([]);
         }
@@ -315,11 +384,7 @@ function ListCheckboxField(
       let result = [...relationConnects];
 
       if (checked) {
-        const item = {
-          id: relation.id,
-          documentId: relation.documentId,
-        };
-        result.push(item);
+        result.push(relation);
       } else {
         result = result.filter((it) => it.id !== relation.id);
       }
@@ -493,3 +558,38 @@ export const Entry = styled.div`
     }
   }
 `;
+
+interface EditFieldSharedProps
+  extends Omit<InputProps, 'hint' | 'label' | 'type'>,
+    Pick<Filters.Filter, 'mainField'> {
+  hint?: string;
+  label: string;
+  size: number;
+  unique?: boolean;
+  visible?: boolean;
+}
+
+/**
+ * Map over all the types in Attribute Types and use that to create a union of new types where the attribute type
+ * is under the property attribute and the type is under the property type.
+ */
+type EditFieldLayout = {
+  [K in SchemaUtils.Attribute.Kind]: EditFieldSharedProps & {
+    attribute: Extract<SchemaUtils.Attribute.AnyAttribute, { type: K }>;
+    type: K;
+  };
+}[SchemaUtils.Attribute.Kind];
+
+interface RelationsFieldProps
+  extends Omit<Extract<EditFieldLayout, { type: 'relation' }>, 'size' | 'hint'>,
+    Pick<InputProps, 'hint'> {}
+
+interface RelationsInputProps extends Omit<RelationsFieldProps, 'type'> {
+  id?: string;
+  model: string;
+  onChange: (
+    relation: Pick<RelationResult, 'documentId' | 'id' | 'locale' | 'status'> & {
+      [key: string]: any;
+    }
+  ) => void;
+}

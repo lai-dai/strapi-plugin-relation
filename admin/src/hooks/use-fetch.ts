@@ -46,8 +46,8 @@ export default function useFetch<T = any>({
       setStatus('loading');
     }
     const cacheKey = keyify(key);
-    if (cache?.enabled && getCache(cacheKey) !== undefined && !hard) {
-      setData(getCache(cacheKey));
+    if (cache?.enabled && getCache?.(cacheKey) !== undefined && !hard) {
+      setData(getCache?.(cacheKey));
       setIsLoading(false);
       setError(undefined);
       setStatus('success');
@@ -57,7 +57,7 @@ export default function useFetch<T = any>({
       .then((data) => {
         setStatus('success');
         setData(data?.data ?? (data as T));
-        if (cache?.enabled) setCache(cacheKey, data?.data ?? data, cache.ttl);
+        if (cache?.enabled) setCache?.(cacheKey, data?.data ?? data, cache.ttl);
       })
       .catch((err) => {
         setStatus('error');
@@ -76,7 +76,7 @@ export default function useFetch<T = any>({
   };
 
   function inValidate(invalidationKey: CustomAxiosConfig['key']) {
-    deleteCache(keyify(invalidationKey));
+    deleteCache?.(keyify(invalidationKey));
   }
 
   React.useEffect(() => {
