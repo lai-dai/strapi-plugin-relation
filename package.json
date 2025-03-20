@@ -1,6 +1,11 @@
 {
   "version": "1.0.3",
-  "keywords": [],
+  "keywords": [
+    "strapi",
+    "relation field",
+    "custom field",
+    "custom relation field"
+  ],
   "type": "commonjs",
   "exports": {
     "./package.json": "./package.json",
@@ -60,11 +65,11 @@
   "strapi": {
     "kind": "plugin",
     "name": "strapi-plugin-relation",
-    "displayName": "Relation Select",
-    "description": "Relation Select"
+    "displayName": "Relation Field",
+    "description": "Relation Field"
   },
   "name": "strapi-plugin-relation",
-  "description": "Relation Select",
+  "description": "Strapi Custom Field - Relation Field",
   "license": "MIT",
   "repository": {
     "type": "git",
