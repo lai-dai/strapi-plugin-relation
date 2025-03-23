@@ -24,4 +24,47 @@ const getRelationLabel = (relation: RelationResult, mainField?: MainField): stri
   return relation.documentId;
 };
 
-export { getRelationLabel };
+const getSelectedRelationUrl = ({
+  model,
+  id,
+  relationName,
+  relationPath,
+}: { model?: string; id?: string; relationName?: string; relationPath?: string } = {}) => {
+  let path = relationPath || '/content-manager/relations/{MODEL}/{ID}/{RELATION_NAME}';
+
+  if (model) {
+    path = path.replace('{MODEL}', model);
+  }
+  if (id) {
+    path = path.replace('{ID}', id);
+  }
+  if (relationName) {
+    path = path.replace('{RELATION_NAME}', relationName);
+  }
+
+  return path;
+};
+
+const getSelectRelationUrl = ({
+  model,
+  relationName,
+  relationPath,
+}: { model?: string; relationName?: string; relationPath?: string } = {}) => {
+  let path = relationPath || '/content-manager/relations/{MODEL}/{RELATION_NAME}';
+
+  if (model) {
+    path = path.replace('{MODEL}', model);
+  }
+  if (relationName) {
+    path = path.replace('{RELATION_NAME}', relationName);
+  }
+
+  return path;
+};
+
+const getNameByRelationName = (relationName?: string): string[] | undefined => {
+  if (!relationName) return undefined;
+  return relationName.match(/\w+|\d+/g) as string[];
+};
+
+export { getRelationLabel, getSelectedRelationUrl, getSelectRelationUrl, getNameByRelationName };

@@ -1,183 +1,136 @@
 import React from 'react';
 import {
-  Filters,
-  InputProps,
   unstable_useContentManagerContext as useContentManagerContext,
   useField,
   useForm,
 } from '@strapi/strapi/admin';
 import { styled } from 'styled-components';
-import { Box, Modal, Field, Button, Checkbox, SearchForm, Searchbar } from '@strapi/design-system';
-
+import { Box, Modal, Field, Button, Checkbox } from '@strapi/design-system';
 import { useIntl } from 'react-intl';
-import { Plus } from '@strapi/icons';
-import { BaseResult, Pagination } from '../types/shared';
-import { RelationResult as RelResult } from '../types/relations';
+import { Plus, ChevronRight, ChevronLeft } from '@strapi/icons';
+import { generateNKeysBetween } from 'fractional-indexing';
+import qs from 'qs';
+
 import { CacheProvider } from '../components/cache-provider';
 import { DocumentStatus } from '../components/document-status';
-import { debounce } from '../utils/debounce';
-import { useCallbackRef } from '../hooks/use-callback-ref';
-import useFetch from '../hooks/use-fetch';
-import { getRelationLabel } from '../utils/relations';
-import { ChevronRight, ChevronLeft } from '@strapi/icons';
-import type { Schema as SchemaUtils } from '@strapi/types';
-import { generateNKeysBetween } from 'fractional-indexing';
+import { SearchInput } from '../components/search-input';
 
-const COLLECTION_TYPES = 'collection-types';
+import { BaseResult, Pagination } from '../types/shared';
+import { RelationFieldProps, RelationConnects, RelationResult } from '../types/type';
 
-interface RelationResult extends RelResult {
-  __temp_key__: string;
-}
+import { useFetch } from '../hooks/use-fetch';
+import { useLazyRef } from '../hooks/use-lazy-ref';
+import { useHandleDisconnect } from '../hooks/use-disconnect';
 
-type RelationPosition =
-  | (Pick<RelationResult, 'status' | 'locale'> & {
-      before: string;
-      end?: never;
-    })
-  | { end: boolean; before?: never; status?: never; locale?: never };
+import {
+  getNameByRelationName,
+  getSelectedRelationUrl,
+  getSelectRelationUrl,
+} from '../utils/relations';
 
-interface Relation extends Pick<RelationResult, 'documentId' | 'id' | 'locale' | 'status'> {
-  href: string;
-  label: string;
-  position?: RelationPosition;
-  __temp_key__: string;
-}
-
-interface RelationsFormValue {
-  connect?: Relation[];
-  disconnect?: Pick<Relation, 'id'>[];
-}
-
-interface InputFieldProps {
-  attribute: {
-    type: string;
-    customField: string;
-    options: {
-      parent_name: string;
-      target_name: string;
-      target_input_hidden: boolean;
-    };
-  };
-  disabled: false;
-  label: string;
-  name: string;
-  placeholder: string;
-  required: false;
-  unique: false;
-  type: string;
-  hint: string;
-  onChange: (e: { target: { name: string; value: string; type: string } }) => void;
-  error?: unknown;
-  initialValue?: string;
-  value?: string;
-  mainField?: unknown;
-  rawError?: unknown;
-  localized?: string;
-}
-
-type RelationConnects = {
-  id: number;
-  documentId: string;
-};
-
-const ONE_WAY_RELATIONS = ['oneWay', 'oneToOne', 'manyToOne', 'oneToManyMorph', 'oneToOneMorph'];
-
-export const MyInputField = (props: InputFieldProps) => {
+export const ChooseRelationField = (props: RelationFieldProps) => {
   return (
     <CacheProvider>
-      <_MyInputField {...props} />
+      <RelationField {...props} />
     </CacheProvider>
   );
 };
 
-function useHandleDisconnect(fieldName: string, consumerName: string) {
-  const field = useField(fieldName);
-  const removeFieldRow = useForm(consumerName, (state) => state.removeFieldRow);
-  const addFieldRow = useForm(consumerName, (state) => state.addFieldRow);
-
-  const handleDisconnect: (relation: Relation) => void = (relation) => {
-    if (field.value && field.value.connect) {
-      /**
-       * A relation will exist in the `connect` array _if_ it has
-       * been added without saving. In this case, we just remove it
-       * from the connect array
-       */
-      const indexOfRelationInConnectArray = field.value.connect.findIndex(
-        (rel: NonNullable<RelationsFormValue['connect']>[number]) => rel.id === relation.id
-      );
-
-      if (indexOfRelationInConnectArray >= 0) {
-        removeFieldRow(`${fieldName}.connect`, indexOfRelationInConnectArray);
-        return;
-      }
-    }
-
-    addFieldRow(`${fieldName}.disconnect`, {
-      id: relation.id,
-      apiData: {
-        id: relation.id,
-        documentId: relation.documentId,
-        locale: relation.locale,
-      },
-    });
-  };
-
-  return handleDisconnect;
-}
-
-export const _MyInputField = (props: InputFieldProps) => {
-  const { label, required, hint, error } = props;
-  const { target_name: targetName, target_input_hidden } = props.attribute.options;
+const RelationField = (props: RelationFieldProps) => {
+  const { label, required, hint, error, attribute } = props;
+  const {
+    relation_name: relationNameProp,
+    relation_hidden: relationHidden,
+    relation_main_field: mainFieldProp,
+    relation_type: relationType,
+    selected_relation_path: selectedRelationPathProp,
+  } = attribute.options;
+  const toOneRelation = relationType === 'single';
 
   const ctx = useContentManagerContext();
-  const { formatMessage } = useIntl();
-  const targetField = useField(targetName);
+  const fullFields = useField(''); // lấy tất cả form fields
 
-  const addFieldRow = useForm('RelationsList', (state) => state.addFieldRow);
-  const handleDisconnect = useHandleDisconnect(targetName, 'RelationsField');
+  /** Kết xuất relation name */
+  const { fullRelationName, fullRelationField, relationName } = React.useMemo(() => {
+    const nameArr = getNameByRelationName(props.name) ?? [];
+    const [c_relationName] = nameArr.slice(-1);
 
-  const mainFieldRef = React.useRef(
-    (ctx.layout.edit.metadatas[targetName] as { mainField: Pick<RelationsFieldProps, 'mainField'> })
-      .mainField
-  );
-  const toOneRelationRef = React.useRef(
-    ONE_WAY_RELATIONS.includes(
-      (ctx.contentType?.attributes?.[targetName] as unknown as Record<string, string>)?.relationType
-    )
-  );
+    let relationNameArr = getNameByRelationName(relationNameProp) ?? [];
+    const [relationName] = relationNameArr.slice(-1);
 
-  const [relationConnects, setRelationConnect] = React.useState<RelationConnects[]>([]);
+    nameArr?.forEach((key, index) => {
+      if (c_relationName === key) return;
 
-  const buttonRef = React.useRef<HTMLButtonElement>(null);
+      if (relationNameArr[index] && relationNameArr[index] !== relationName) {
+        relationNameArr[index] = key;
+      }
+    });
 
+    const fullRelationName = relationNameArr.join('.');
+
+    const fullRelationField = relationNameArr.reduce((values, key) => {
+      if (key === relationName) {
+        return values;
+      }
+      return values[key];
+    }, fullFields?.value ?? {});
+
+    return {
+      relationName,
+      fullRelationName,
+      fullRelationField,
+    };
+  }, [props]);
+
+  /** Ẩn relation input */
   React.useEffect(() => {
-    if (target_input_hidden) {
-      const inputEl = document.querySelector(`input[name="${targetName}"]`) as HTMLInputElement;
+    if (relationHidden) {
+      const relationInputEl = document.querySelector(
+        `input[name="${fullRelationName}"]`
+      ) as HTMLInputElement;
 
-      if (inputEl) {
-        const parent = inputEl.parentNode?.parentNode as HTMLDivElement;
+      if (relationInputEl) {
+        const parentRelationInputEl = relationInputEl.parentNode?.parentNode as HTMLDivElement;
 
-        if (parent) {
-          parent.style.display = 'none';
+        if (parentRelationInputEl) {
+          parentRelationInputEl.style.display = 'none';
         }
       }
     }
-  }, [target_input_hidden]);
+  }, [relationHidden]);
 
-  const { data } = useFetch({
-    key: ['one-relation', toOneRelationRef.current, ctx.model, ctx.id, targetName],
-    url: `/content-manager/relations/${ctx.model}/${ctx.id}/${targetName}`,
+  const relationField = fullRelationField[relationNameProp];
+  const id = fullRelationField?.id ? fullRelationField.id : ctx.id;
+  const model = ctx.model;
+
+  const [relationPath, initParams] = selectedRelationPathProp?.split('?') ?? [];
+  const initParamsRef = useLazyRef(() => {
+    return initParams ? qs.parse(initParams) : {};
+  });
+
+  // dùng cho one relation
+  const { data: relationSelectedData } = useFetch({
+    key: ['relation-selected', relationPath, id, model, relationName, toOneRelation],
+    url: getSelectedRelationUrl({ relationPath, id, model, relationName }),
     config: {
       params: {
         pageSize: 1,
         page: 1,
+        ...initParamsRef.current,
       },
     },
-    initialEnabled: toOneRelationRef.current,
+    initialEnabled: toOneRelation,
   });
 
-  const handleConnect: RelationsInputProps['onChange'] = React.useCallback(
-    (relation) => {
+  const addFieldRow = useForm('RelationsList', (state) => state.addFieldRow);
+  const handleDisconnect = useHandleDisconnect(fullRelationName, 'RelationsField');
+
+  const handleConnect = React.useCallback(
+    (
+      relation: Pick<RelationResult, 'documentId' | 'id' | 'locale' | 'status'> & {
+        [key: string]: any;
+      }
+    ) => {
       const item = {
         id: relation.id,
         apiData: {
@@ -191,92 +144,44 @@ export const _MyInputField = (props: InputFieldProps) => {
          */
         __temp_key__: generateNKeysBetween(null, null, 1)[0],
         // Fallback to `id` if there is no `mainField` value, which will overwrite the above `id` property with the exact same data.
-        [(mainFieldRef.current ?? 'documentId') as string]:
-          relation[(mainFieldRef.current ?? 'documentId') as string],
-        label: getRelationLabel(relation, { name: mainFieldRef.current as string }),
-        href: `../${COLLECTION_TYPES}/${ctx.model}/${relation.documentId}?${relation.locale ? `plugins[i18n][locale]=${relation.locale}` : ''}`,
+        [(mainFieldProp ?? 'documentId') as string]:
+          relation[(mainFieldProp ?? 'documentId') as string],
+        label: relation[mainFieldProp] ?? relation.documentId,
+        href: `../collection-types/${ctx.model}/${relation.documentId}?${relation.locale ? `plugins[i18n][locale]=${relation.locale}` : ''}`,
       };
 
-      if (toOneRelationRef.current) {
-        targetField.value?.connect?.forEach(handleDisconnect);
+      if (toOneRelation) {
+        relationField?.connect?.forEach(handleDisconnect); // xóa đã chọn từ hiện tai
 
-        data?.results?.forEach(handleDisconnect);
+        relationSelectedData?.results?.forEach(handleDisconnect); // xóa đã chọn từ server
       }
 
-      addFieldRow(`${targetName}.connect`, item);
-
-      setRelationConnect([]);
+      addFieldRow(`${fullRelationName}.connect`, item); // thêm
     },
-    [targetName, data?.results, targetField.value]
+    [fullRelationName, relationSelectedData?.results, relationField?.connect, toOneRelation]
   );
 
-  const handleSubmit = React.useCallback(async () => {
-    if (!relationConnects.length) {
-      return;
-    }
+  const handleSubmit = React.useCallback(
+    async (relations: RelationConnects[]) => {
+      if (!relations.length) {
+        return;
+      }
 
-    relationConnects.forEach((it) => {
-      handleConnect(it);
-    });
-  }, [relationConnects]);
+      relations.forEach((relation) => {
+        handleConnect(relation);
+      });
+    },
+    [handleConnect]
+  );
 
   return (
     <div>
       <Field.Root hint={hint} error={error} required={required}>
         {label ? <Field.Label>{label}</Field.Label> : null}
 
-        <Modal.Root>
-          <Box paddingTop={target_input_hidden ? '12px' : undefined}>
-            <Modal.Trigger>
-              <Button ref={buttonRef} variant={'secondary'} style={{ height: '3.7rem' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Plus />
-
-                  {formatMessage({
-                    id: 'settings.button-choose',
-                    defaultMessage: 'Choose',
-                  })}
-                </span>
-              </Button>
-            </Modal.Trigger>
-          </Box>
-          <Modal.Content>
-            <Modal.Header>
-              <Modal.Title>
-                {formatMessage({
-                  id: 'settings.modal-title',
-                  defaultMessage: 'Add Entry',
-                })}
-              </Modal.Title>
-            </Modal.Header>
-            <Modal.Body>
-              <ModalContent
-                {...props}
-                relationConnects={relationConnects}
-                setRelationConnect={setRelationConnect}
-              />
-            </Modal.Body>
-            <Modal.Footer>
-              <Modal.Close>
-                <Button variant="tertiary">
-                  {formatMessage({
-                    id: 'settings.modal-button-close',
-                    defaultMessage: 'Close',
-                  })}
-                </Button>
-              </Modal.Close>
-
-              <Modal.Close>
-                <Button onClick={handleSubmit}>
-                  {formatMessage({
-                    id: 'settings.modal-button-confirm',
-                    defaultMessage: 'OK',
-                  })}
-                </Button>
-              </Modal.Close>
-            </Modal.Footer>
-          </Modal.Content>
-        </Modal.Root>
+        <Box paddingTop={relationHidden ? 2 : undefined}>
+          <RelationListModal {...props} onSubmit={handleSubmit} />
+        </Box>
 
         <Field.Error />
         <Field.Hint />
@@ -285,107 +190,261 @@ export const _MyInputField = (props: InputFieldProps) => {
   );
 };
 
-const ModalContent = (
-  props: InputFieldProps & {
-    relationConnects: RelationConnects[];
-    setRelationConnect: (value: RelationConnects[]) => void;
-  }
-) => {
-  const { parent_name: parentName } = props.attribute.options;
-
-  const ctx = useContentManagerContext();
-  const { formatMessage } = useIntl();
-  const parentField = useField<RelationsFormValue>(parentName);
-
+function RelationListModal({
+  onSubmit,
+  ...props
+}: RelationFieldProps & {
+  onSubmit?: (relations: RelationConnects[]) => void;
+}) {
   const {
-    data: parentData,
-    status,
-    error,
-  } = useFetch({
-    key: ['relations-parent', ctx.model, ctx.id, parentName],
-    url: `/content-manager/relations/${ctx.model}/${ctx.id}/${parentName}`,
+    parent_relation_name: parentRelationNameProp,
+    selected_parent_relation_path: selectedParentRelationPathProp,
+  } = props.attribute.options;
+
+  const { formatMessage } = useIntl();
+  const ctx = useContentManagerContext();
+  const fullFields = useField(''); // lấy tất cả form fields
+
+  const [open, setOpen] = React.useState(false);
+  const [relationConnects, setRelationConnects] = React.useState<RelationConnects[]>([]);
+
+  /** Kết xuất relation name */
+  const { fullParentRelationField, parentRelationName } = React.useMemo(() => {
+    const nameArr = getNameByRelationName(props.name) ?? [];
+    const [c_relationName] = nameArr.slice(-1);
+
+    let parentRelationNameArr = getNameByRelationName(parentRelationNameProp) ?? [];
+    const [parentRelationName] = parentRelationNameArr.slice(-1);
+
+    // cập nhật index nếu có
+    nameArr?.forEach((key, index) => {
+      if (c_relationName === key) return;
+
+      if (parentRelationNameArr[index] && parentRelationNameArr[index] !== parentRelationName) {
+        parentRelationNameArr[index] = key;
+      }
+    });
+
+    // const fullParentRelationName = parentRelationNameArr.join('.'); // parent không cần ghép
+
+    const fullParentRelationField = parentRelationNameArr.reduce((values, key) => {
+      if (key === parentRelationName) {
+        return values;
+      }
+      return values[key];
+    }, fullFields?.value ?? {});
+
+    return {
+      parentRelationName,
+      fullParentRelationField,
+    };
+  }, [props]);
+
+  const [parentRelationPath, initParams] = selectedParentRelationPathProp?.split('?') ?? [];
+  const initParamsRef = useLazyRef(() => {
+    return initParams ? qs.parse(initParams) : {};
+  });
+
+  const parentRelationField = fullParentRelationField[parentRelationName]; // giá trị hiện tại trong form
+  const id = fullParentRelationField?.id ? fullParentRelationField.id : ctx.id;
+  const model = ctx.model;
+
+  const { data: parentRelationSelectedData } = useFetch({
+    key: ['parent-relation-selected', ctx.model, ctx.id, parentRelationName],
+    url: getSelectedRelationUrl({
+      relationPath: parentRelationPath,
+      id,
+      model,
+      relationName: parentRelationName,
+    }),
     config: {
       params: {
         pageSize: 1,
         page: 1,
+        ...initParamsRef.current,
       },
     },
-    initialEnabled: !!ctx.id,
+    initialEnabled: !!parentRelationNameProp,
   });
 
-  if (status === 'pending') {
-    return formatMessage({
-      id: 'settings.loading',
-      defaultMessage: 'Loading...',
-    });
-  }
+  const parentRelationId =
+    parentRelationField?.connect?.[0]?.id ??
+    (parentRelationField?.disconnect?.[0]
+      ? undefined
+      : parentRelationSelectedData?.results?.[0]?.id);
 
-  if (status === 'error') {
-    return (
-      error?.message ??
-      formatMessage({
-        id: 'settings.error',
-        defaultMessage: 'Error',
-      })
-    );
-  }
+  return (
+    <Modal.Root
+      open={open}
+      onOpenChange={(open: boolean) => {
+        setOpen(open);
+        if (!open) {
+          setRelationConnects([]);
+        }
+      }}
+    >
+      <Modal.Trigger>
+        <Button variant={'secondary'} style={{ height: '3.7rem' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Plus />
 
-  const parentId = parentField.value?.connect?.[0]?.id ?? parentData?.results?.[0]?.id;
+            {formatMessage({
+              id: 'settings.button-choose',
+              defaultMessage: 'Choose',
+            })}
+          </span>
+        </Button>
+      </Modal.Trigger>
 
-  return <ListCheckboxField {...props} parentId={parentId!} />;
-};
+      <Modal.Content>
+        <Modal.Header>
+          <Modal.Title>
+            {formatMessage({
+              id: 'settings.modal-title',
+              defaultMessage: 'Add Entry',
+            })}
+          </Modal.Title>
+        </Modal.Header>
 
-function ListCheckboxField(
-  props: InputFieldProps & {
-    parentId: number;
-    relationConnects: RelationConnects[];
-    setRelationConnect: (value: RelationConnects[]) => void;
-  }
-) {
-  const { attribute, parentId, setRelationConnect, relationConnects } = props;
-  const { target_name: targetName, parent_name: parentName } = attribute.options;
+        <Modal.Body>
+          <RelationListContent
+            {...props}
+            relationConnects={relationConnects}
+            setRelationConnect={setRelationConnects}
+            parentRelationId={parentRelationId}
+          />
+        </Modal.Body>
+
+        <Modal.Footer>
+          <Modal.Close>
+            <Button variant="tertiary">
+              {formatMessage({
+                id: 'settings.modal-button-close',
+                defaultMessage: 'Close',
+              })}
+            </Button>
+          </Modal.Close>
+
+          <Modal.Close>
+            <Button onClick={() => onSubmit?.(relationConnects)}>
+              {formatMessage({
+                id: 'settings.modal-button-confirm',
+                defaultMessage: 'OK',
+              })}
+            </Button>
+          </Modal.Close>
+        </Modal.Footer>
+      </Modal.Content>
+    </Modal.Root>
+  );
+}
+
+interface RelationListProps extends RelationFieldProps {
+  relationConnects: RelationConnects[];
+  setRelationConnect: (value: RelationConnects[]) => void;
+  parentRelationId?: number;
+}
+
+function RelationListContent(props: RelationListProps) {
+  const { attribute, setRelationConnect, relationConnects, parentRelationId } = props;
+  const {
+    relation_name: relationNameProp,
+    relation_main_field: mainField,
+    select_relation_path: selectRelationPath,
+    relation_type: relationType,
+  } = attribute.options;
+  const toOneRelation = relationType === 'single';
+
+  const { formatMessage } = useIntl();
+  const ctx = useContentManagerContext();
+  const fullFields = useField(''); // lấy tất cả form fields
 
   const [search, setSearch] = React.useState('');
   const [page, setPage] = React.useState(1);
 
-  const { formatMessage } = useIntl();
-  const ctx = useContentManagerContext();
-  const targetField = useField<RelationsFormValue>(targetName);
+  /** Kết xuất relation name */
+  const { fullRelationField, relationName } = React.useMemo(() => {
+    const nameArr = getNameByRelationName(props.name) ?? [];
+    const [c_relationName] = nameArr.slice(-1);
 
-  const mainFieldRef = React.useRef(
-    (ctx.layout.edit.metadatas[targetName] as { mainField: string }).mainField
-  );
+    let relationNameArr = getNameByRelationName(relationNameProp) ?? [];
+    const [relationName] = relationNameArr.slice(-1);
+
+    nameArr?.forEach((key, index) => {
+      if (c_relationName === key) return;
+
+      if (relationNameArr[index] && relationNameArr[index] !== relationName) {
+        relationNameArr[index] = key;
+      }
+    });
+
+    // const fullRelationName = relationNameArr.join('.'); // trong list ko dùng
+
+    const fullRelationField = relationNameArr.reduce((values, key) => {
+      if (key === relationName) {
+        return values;
+      }
+      return values[key];
+    }, fullFields?.value ?? {});
+
+    return {
+      relationName,
+      fullRelationField,
+    };
+  }, [props]);
+
+  const relationField = fullRelationField[relationName];
+  const id = fullRelationField?.id ? fullRelationField.id : ctx.id;
+  const model = ctx.model;
+
+  const [relationPath, _initParams] = selectRelationPath?.split('?') ?? [];
+  const initParams = React.useMemo(() => {
+    if (!_initParams) return {};
+
+    const str = _initParams.replace(
+      '{PARENT_RELATION_ID}',
+      parentRelationId ? String(parentRelationId) : 'undefined'
+    );
+
+    return qs.parse(str, {
+      decoder: (str) => {
+        if (str === 'undefined') return undefined;
+        return str;
+      },
+    });
+  }, [parentRelationId, _initParams]);
 
   const { data, status, error } = useFetch<{
     pagination: Pagination;
     results: BaseResult[];
   }>({
-    key: ['relations-target', ctx.model, targetName, search, parentId, parentName, page],
-    url: `/content-manager/relations/${ctx.model}/${targetName}`,
+    key: [
+      'relations-list',
+      relationPath,
+      model,
+      relationName,
+      id,
+      page,
+      search,
+      initParams,
+      relationField,
+    ],
+    url: getSelectRelationUrl({ relationPath, model, relationName }),
     config: {
       params: {
-        id: ctx.isSingleType ? undefined : ctx.id,
+        id,
+        page,
         pageSize: 10,
         _q: search,
-        page: page,
-        filters: {
-          [parentName]: {
-            $eq: parentId,
-          },
-        },
-        idsToInclude: targetField.value?.disconnect?.map((rel) => rel.id) ?? [],
-        idsToOmit: targetField.value?.connect?.map((rel) => rel.id) ?? [],
+        idsToInclude: relationField?.disconnect?.map((rel: RelationResult) => rel.id) ?? [],
+        idsToOmit: relationField?.connect?.map((rel: RelationResult) => rel.id) ?? [],
+        ...initParams,
       },
     },
     cache: {
       ttl: 0,
     },
-    initialEnabled: !!ctx.id,
   });
-
-  const toOneRelation = ONE_WAY_RELATIONS.includes(
-    (ctx.contentType?.attributes?.[targetName] as unknown as Record<string, string>)?.relationType
-  );
 
   const handleCheckedChange = React.useCallback(
     (checked: boolean, relation: BaseResult) => {
@@ -449,7 +508,7 @@ function ListCheckboxField(
                     handleCheckedChange(checked, relation);
                   }}
                 >
-                  {getRelationLabel(relation, { name: mainFieldRef.current })}
+                  {relation[mainField] ?? relation.documentId}
 
                   {relation.status ? <DocumentStatus status={relation.status as string} /> : null}
                 </Checkbox>
@@ -507,45 +566,6 @@ function ListCheckboxField(
   );
 }
 
-interface SearchInputProps {
-  search?: string;
-  onSearchChange?: (value: string) => void;
-}
-
-function SearchInput({ onSearchChange, search = '' }: SearchInputProps) {
-  const onChangeProp = useCallbackRef(onSearchChange);
-
-  const [value, setValue] = React.useState(search);
-
-  const { formatMessage } = useIntl();
-
-  const handleDebounceSearch = React.useCallback(debounce(onChangeProp, 450), []);
-
-  const handleChange = React.useCallback((value: string) => {
-    setValue(value);
-    handleDebounceSearch(value);
-  }, []);
-
-  return (
-    <SearchForm>
-      <Searchbar
-        name="searchbar"
-        onClear={() => {
-          handleChange('');
-        }}
-        value={value}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-          handleChange(e.target.value);
-        }}
-        placeholder={formatMessage({
-          id: 'settings.search-input-placeholder',
-          defaultMessage: 'Search',
-        })}
-      />
-    </SearchForm>
-  );
-}
-
 export const Entry = styled.div`
   display: block;
 
@@ -575,38 +595,3 @@ export const Entry = styled.div`
     }
   }
 `;
-
-interface EditFieldSharedProps
-  extends Omit<InputProps, 'hint' | 'label' | 'type'>,
-    Pick<Filters.Filter, 'mainField'> {
-  hint?: string;
-  label: string;
-  size: number;
-  unique?: boolean;
-  visible?: boolean;
-}
-
-/**
- * Map over all the types in Attribute Types and use that to create a union of new types where the attribute type
- * is under the property attribute and the type is under the property type.
- */
-type EditFieldLayout = {
-  [K in SchemaUtils.Attribute.Kind]: EditFieldSharedProps & {
-    attribute: Extract<SchemaUtils.Attribute.AnyAttribute, { type: K }>;
-    type: K;
-  };
-}[SchemaUtils.Attribute.Kind];
-
-interface RelationsFieldProps
-  extends Omit<Extract<EditFieldLayout, { type: 'relation' }>, 'size' | 'hint'>,
-    Pick<InputProps, 'hint'> {}
-
-interface RelationsInputProps extends Omit<RelationsFieldProps, 'type'> {
-  id?: string;
-  model: string;
-  onChange: (
-    relation: Pick<RelationResult, 'documentId' | 'id' | 'locale' | 'status'> & {
-      [key: string]: any;
-    }
-  ) => void;
-}

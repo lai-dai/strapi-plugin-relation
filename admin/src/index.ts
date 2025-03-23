@@ -42,7 +42,7 @@ export default {
       components: {
         Input: async () =>
           import('./components/relation-field').then((module) => ({
-            default: module.MyInputField,
+            default: module.ChooseRelationField,
           })),
       },
       options: {
@@ -50,38 +50,94 @@ export default {
           {
             intlLabel: {
               id: getTranslation('settings.title'),
-              defaultMessage: 'Target Name',
+              defaultMessage: 'Relation Name',
             },
-            intlDescription: {
-              id: getTranslation('settings.description'),
-              defaultMessage: 'Your Relation',
-            },
-            name: 'options.target_name',
+            name: 'options.relation_name',
             type: 'text',
           },
           {
             intlLabel: {
               id: getTranslation('settings.title'),
-              defaultMessage: 'Parent Name',
+              defaultMessage: 'Relation Main Field',
             },
-            intlDescription: {
-              id: getTranslation('settings.description'),
-              defaultMessage: 'Your Relation',
-            },
-            name: 'options.parent_name',
+            name: 'options.relation_main_field',
             type: 'text',
           },
           {
             intlLabel: {
               id: getTranslation('settings.title'),
-              defaultMessage: 'Target Input Hidden',
+              defaultMessage: 'Hidden Relation Input',
             },
-            intlDescription: {
-              id: getTranslation('settings.description'),
-              defaultMessage: 'Hidden Your Relation',
-            },
-            name: 'options.target_input_hidden',
+            name: 'options.relation_hidden',
             type: 'checkbox',
+          },
+          {
+            intlLabel: {
+              id: getTranslation('settings.title'),
+              defaultMessage: 'Relation Type',
+            },
+            name: 'options.relation_type',
+            type: 'select',
+            value: 'single',
+            options: [
+              {
+                key: 'single',
+                defaultValue: 'single',
+                value: 'single',
+                metadatas: {
+                  intlLabel: {
+                    id: getTranslation('settings.title'),
+                    defaultMessage: 'Single',
+                  },
+                },
+              },
+              {
+                key: 'multiple',
+                value: 'multiple',
+                metadatas: {
+                  intlLabel: {
+                    id: getTranslation('settings.title'),
+                    defaultMessage: 'multiple',
+                  },
+                },
+              },
+            ],
+          },
+          {
+            intlLabel: {
+              id: getTranslation('settings.title'),
+              defaultMessage: 'Select Relation Path',
+            },
+            name: 'options.select_relation_path',
+            type: 'text',
+          },
+          {
+            intlLabel: {
+              id: getTranslation('settings.title'),
+              defaultMessage: 'Selected Relation Path',
+            },
+            intlDescription: {
+              id: getTranslation('settings.description'),
+              defaultMessage: 'Use Relation Single Type',
+            },
+            name: 'options.selected_relation_path',
+            type: 'text',
+          },
+          {
+            intlLabel: {
+              id: getTranslation('settings.title'),
+              defaultMessage: 'Parent Relation Name',
+            },
+            name: 'options.parent_relation_name',
+            type: 'text',
+          },
+          {
+            intlLabel: {
+              id: getTranslation('settings.title'),
+              defaultMessage: 'Selected Parent Relation Path',
+            },
+            name: 'options.selected_parent_relation_path',
+            type: 'text',
           },
         ],
       },

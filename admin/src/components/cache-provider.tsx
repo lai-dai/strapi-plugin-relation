@@ -1,5 +1,7 @@
 import { createContext, useContext, ReactNode } from 'react';
 
+import { useMap } from '../hooks/use-map';
+
 type ContextType = {
   getCache: (key: string) => any;
   setCache: (key: string, value: any, ttl?: number) => void;
@@ -19,7 +21,7 @@ export function useCache() {
 }
 
 export function CacheProvider({ children }: { children: ReactNode }) {
-  const map = new Map<string, cacheBody>();
+  const map = useMap<string, cacheBody>();
 
   function getCache(key: string) {
     const cacheValue = map.get(key);

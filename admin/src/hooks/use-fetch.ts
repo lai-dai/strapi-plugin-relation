@@ -19,7 +19,7 @@ export function keyify(key: CustomAxiosConfig['key']) {
   return key.map((item) => JSON.stringify(item)).join('-');
 }
 
-export default function useFetch<T = any>({
+export function useFetch<T = any>({
   key,
   initialEnabled = true,
   cache = { enabled: true, ttl: 60 },
