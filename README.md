@@ -1,6 +1,6 @@
 # strapi-plugin-relation
 
-Đây là lại `custom field` cho `stapi v5` có thể tùy chọn thêm bộ lọc tùy chỉnh hoặc quan hệ với 1 `relation field` khác (chỉ one relation)
+Đây là `custom field` cho `stapi v5` có thể thêm bộ lọc tùy chỉnh hoặc có lọc với 1 `relation field` khác (chỉ one relation)
 
 Dùng cho `Collection types`, `single types`, có thể dùng trong `Dynamic zone` & `Component`
 
@@ -42,18 +42,24 @@ Select path with filter & parent relation id
 
 ### Relation name
 
-Relation Name
+DYNAMIC ZONE
 
 ```
-nav_items.{INDEX1}.items.{INDEX2}.articles
+Level 1
+{DYNAMIC1}.{INDEX1}.category
+
+Level 2
+{DYNAMIC1}.{INDEX1}.{DYNAMIC2}.{INDEX2}.articles
 ```
 
-Parent Relation Name
+COMPONENT SINGLE & COMPONENT REPEATABLE (is same)
 
 ```
-nav_items.{INDEX1}.items.{INDEX2}.category
-or
-nav_items.{INDEX1}.category
+Level 1
+{DYNAMIC1}.{INDEX1}.category
+
+Level 2
+{COMPONENT1}.{INDEX1}.{COMPONENT2}.{INDEX2}.articles
 ```
 
 Relation Name -> regex by relationName.match(/\w+|\d+/g)

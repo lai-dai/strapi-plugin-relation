@@ -66,6 +66,26 @@ export default {
           {
             intlLabel: {
               id: getTranslation('settings.title'),
+              defaultMessage: 'Select Relation Path',
+            },
+            name: 'options.select_relation_path',
+            type: 'text',
+          },
+          {
+            intlLabel: {
+              id: getTranslation('settings.title'),
+              defaultMessage: 'Selected Relation Path',
+            },
+            intlDescription: {
+              id: getTranslation('settings.description'),
+              defaultMessage: 'Use Relation Single Type',
+            },
+            name: 'options.selected_relation_path',
+            type: 'text',
+          },
+          {
+            intlLabel: {
+              id: getTranslation('settings.title'),
               defaultMessage: 'Hidden Relation Input',
             },
             name: 'options.relation_hidden',
@@ -106,22 +126,18 @@ export default {
           {
             intlLabel: {
               id: getTranslation('settings.title'),
-              defaultMessage: 'Select Relation Path',
+              defaultMessage: 'Relation in Component',
             },
-            name: 'options.select_relation_path',
-            type: 'text',
+            name: 'options.relation_component_scope',
+            type: 'checkbox',
           },
           {
             intlLabel: {
               id: getTranslation('settings.title'),
-              defaultMessage: 'Selected Relation Path',
+              defaultMessage: 'Parent Relation in Component',
             },
-            intlDescription: {
-              id: getTranslation('settings.description'),
-              defaultMessage: 'Use Relation Single Type',
-            },
-            name: 'options.selected_relation_path',
-            type: 'text',
+            name: 'options.parent_relation_component_scope',
+            type: 'checkbox',
           },
           {
             intlLabel: {

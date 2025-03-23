@@ -40,6 +40,9 @@ export interface RelationFieldProps {
 
       parent_relation_name: string;
       selected_parent_relation_path: string;
+
+      relation_component_scope: boolean;
+      parent_relation_component_scope: boolean;
     };
   };
   disabled: false;

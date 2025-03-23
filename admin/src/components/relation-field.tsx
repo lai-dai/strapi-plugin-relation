@@ -44,6 +44,7 @@ const RelationField = (props: RelationFieldProps) => {
     relation_main_field: mainFieldProp,
     relation_type: relationType,
     selected_relation_path: selectedRelationPathProp,
+    relation_component_scope: relationComponentScope,
   } = attribute.options;
   const toOneRelation = relationType === 'single';
 
@@ -58,9 +59,10 @@ const RelationField = (props: RelationFieldProps) => {
     let relationNameArr = getNameByRelationName(relationNameProp) ?? [];
     const [relationName] = relationNameArr.slice(-1);
 
-    nameArr?.forEach((key, index) => {
-      if (c_relationName === key) return;
+    nameArr.forEach((key, index) => {
+      if (c_relationName === key) return; // dừng lại khi ở gần cuối chuỗi
 
+      /** không thay đổi giá trị name cuối cùng */
       if (relationNameArr[index] && relationNameArr[index] !== relationName) {
         relationNameArr[index] = key;
       }
@@ -80,7 +82,7 @@ const RelationField = (props: RelationFieldProps) => {
       fullRelationName,
       fullRelationField,
     };
-  }, [props]);
+  }, [props, fullFields?.value]);
 
   /** Ẩn relation input */
   React.useEffect(() => {
@@ -100,7 +102,7 @@ const RelationField = (props: RelationFieldProps) => {
   }, [relationHidden]);
 
   const relationField = fullRelationField[relationNameProp];
-  const id = fullRelationField?.id ? fullRelationField.id : ctx.id;
+  const id = fullRelationField?.id ? fullRelationField.id : relationComponentScope ? '' : ctx.id;
   const model = ctx.model;
 
   const [relationPath, initParams] = selectedRelationPathProp?.split('?') ?? [];
@@ -119,7 +121,7 @@ const RelationField = (props: RelationFieldProps) => {
         ...initParamsRef.current,
       },
     },
-    initialEnabled: toOneRelation,
+    initialEnabled: toOneRelation && !!id,
   });
 
   const addFieldRow = useForm('RelationsList', (state) => state.addFieldRow);
@@ -199,6 +201,7 @@ function RelationListModal({
   const {
     parent_relation_name: parentRelationNameProp,
     selected_parent_relation_path: selectedParentRelationPathProp,
+    parent_relation_component_scope: parentRelationComponentScope,
   } = props.attribute.options;
 
   const { formatMessage } = useIntl();
@@ -238,7 +241,7 @@ function RelationListModal({
       parentRelationName,
       fullParentRelationField,
     };
-  }, [props]);
+  }, [props, fullFields?.value]);
 
   const [parentRelationPath, initParams] = selectedParentRelationPathProp?.split('?') ?? [];
   const initParamsRef = useLazyRef(() => {
@@ -246,11 +249,23 @@ function RelationListModal({
   });
 
   const parentRelationField = fullParentRelationField[parentRelationName]; // giá trị hiện tại trong form
-  const id = fullParentRelationField?.id ? fullParentRelationField.id : ctx.id;
+  const id = fullParentRelationField?.id
+    ? fullParentRelationField.id
+    : parentRelationComponentScope
+      ? ''
+      : ctx.id;
   const model = ctx.model;
 
   const { data: parentRelationSelectedData } = useFetch({
-    key: ['parent-relation-selected', ctx.model, ctx.id, parentRelationName],
+    key: [
+      'parent-relation-selected',
+      ctx.model,
+      ctx.id,
+      parentRelationPath,
+      parentRelationName,
+      parentRelationNameProp,
+      initParamsRef.current,
+    ],
     url: getSelectedRelationUrl({
       relationPath: parentRelationPath,
       id,
@@ -264,7 +279,7 @@ function RelationListModal({
         ...initParamsRef.current,
       },
     },
-    initialEnabled: !!parentRelationNameProp,
+    initialEnabled: !!parentRelationNameProp && !!id,
   });
 
   const parentRelationId =
@@ -352,6 +367,7 @@ function RelationListContent(props: RelationListProps) {
     relation_main_field: mainField,
     select_relation_path: selectRelationPath,
     relation_type: relationType,
+    relation_component_scope: relationComponentScope,
   } = attribute.options;
   const toOneRelation = relationType === 'single';
 
@@ -391,10 +407,10 @@ function RelationListContent(props: RelationListProps) {
       relationName,
       fullRelationField,
     };
-  }, [props]);
+  }, [props, fullFields?.value]);
 
   const relationField = fullRelationField[relationName];
-  const id = fullRelationField?.id ? fullRelationField.id : ctx.id;
+  const id = fullRelationField?.id ? fullRelationField.id : relationComponentScope ? '' : ctx.id;
   const model = ctx.model;
 
   const [relationPath, _initParams] = selectRelationPath?.split('?') ?? [];
