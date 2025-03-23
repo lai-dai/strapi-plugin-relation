@@ -43,6 +43,8 @@ export interface RelationFieldProps {
 
       relation_component_scope: boolean;
       parent_relation_component_scope: boolean;
+
+      select_relation_strict: boolean;
     };
   };
   disabled: false;

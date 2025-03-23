@@ -24,13 +24,24 @@ const getRelationLabel = (relation: RelationResult, mainField?: MainField): stri
   return relation.documentId;
 };
 
-const getSelectedRelationUrl = ({
+const getRelationUrl = ({
   model,
   id,
   relationName,
   relationPath,
-}: { model?: string; id?: string; relationName?: string; relationPath?: string } = {}) => {
-  let path = relationPath || '/content-manager/relations/{MODEL}/{ID}/{RELATION_NAME}';
+  parentRelationName,
+  parentRelationId,
+  defaultPath = '/content-manager/relations/{MODEL}/{ID}/{RELATION_NAME}?filters[{PARENT_RELATION_NAME}][$eq]={PARENT_RELATION_ID}',
+}: {
+  model?: string;
+  id?: string;
+  relationName?: string;
+  relationPath?: string;
+  parentRelationName?: string;
+  defaultPath?: string;
+  parentRelationId?: string | number;
+} = {}) => {
+  let path = relationPath || defaultPath;
 
   if (model) {
     path = path.replace('{MODEL}', model);
@@ -41,22 +52,11 @@ const getSelectedRelationUrl = ({
   if (relationName) {
     path = path.replace('{RELATION_NAME}', relationName);
   }
-
-  return path;
-};
-
-const getSelectRelationUrl = ({
-  model,
-  relationName,
-  relationPath,
-}: { model?: string; relationName?: string; relationPath?: string } = {}) => {
-  let path = relationPath || '/content-manager/relations/{MODEL}/{RELATION_NAME}';
-
-  if (model) {
-    path = path.replace('{MODEL}', model);
+  if (parentRelationName) {
+    path = path.replace('{PARENT_RELATION_NAME}', parentRelationName);
   }
-  if (relationName) {
-    path = path.replace('{RELATION_NAME}', relationName);
+  if (parentRelationId) {
+    path = path.replace('{PARENT_RELATION_ID}', String(parentRelationId));
   }
 
   return path;
@@ -67,4 +67,4 @@ const getNameByRelationName = (relationName?: string): string[] | undefined => {
   return relationName.match(/\w+|\d+/g) as string[];
 };
 
-export { getRelationLabel, getSelectedRelationUrl, getSelectRelationUrl, getNameByRelationName };
+export { getRelationLabel, getNameByRelationName, getRelationUrl };

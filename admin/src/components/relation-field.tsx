@@ -3,6 +3,7 @@ import {
   unstable_useContentManagerContext as useContentManagerContext,
   useField,
   useForm,
+  useNotification,
 } from '@strapi/strapi/admin';
 import { styled } from 'styled-components';
 import { Box, Modal, Field, Button, Checkbox } from '@strapi/design-system';
@@ -22,11 +23,7 @@ import { useFetch } from '../hooks/use-fetch';
 import { useLazyRef } from '../hooks/use-lazy-ref';
 import { useHandleDisconnect } from '../hooks/use-disconnect';
 
-import {
-  getNameByRelationName,
-  getSelectedRelationUrl,
-  getSelectRelationUrl,
-} from '../utils/relations';
+import { getNameByRelationName, getRelationUrl } from '../utils/relations';
 
 export const ChooseRelationField = (props: RelationFieldProps) => {
   return (
@@ -101,7 +98,7 @@ const RelationField = (props: RelationFieldProps) => {
     }
   }, [relationHidden]);
 
-  const relationField = fullRelationField[relationNameProp];
+  const relationField = fullRelationField?.[relationName];
   const id = fullRelationField?.id ? fullRelationField.id : relationComponentScope ? '' : ctx.id;
   const model = ctx.model;
 
@@ -113,7 +110,13 @@ const RelationField = (props: RelationFieldProps) => {
   // dùng cho one relation
   const { data: relationSelectedData } = useFetch({
     key: ['relation-selected', relationPath, id, model, relationName, toOneRelation],
-    url: getSelectedRelationUrl({ relationPath, id, model, relationName }),
+    url: getRelationUrl({
+      id,
+      model,
+      relationName,
+      relationPath,
+      defaultPath: '/content-manager/relations/{MODEL}/{ID}/{RELATION_NAME}',
+    }),
     config: {
       params: {
         pageSize: 1,
@@ -220,7 +223,7 @@ function RelationListModal({
     const [parentRelationName] = parentRelationNameArr.slice(-1);
 
     // cập nhật index nếu có
-    nameArr?.forEach((key, index) => {
+    nameArr.forEach((key, index) => {
       if (c_relationName === key) return;
 
       if (parentRelationNameArr[index] && parentRelationNameArr[index] !== parentRelationName) {
@@ -248,7 +251,7 @@ function RelationListModal({
     return initParams ? qs.parse(initParams) : {};
   });
 
-  const parentRelationField = fullParentRelationField[parentRelationName]; // giá trị hiện tại trong form
+  const parentRelationField = fullParentRelationField?.[parentRelationName]; // giá trị hiện tại trong form
   const id = fullParentRelationField?.id
     ? fullParentRelationField.id
     : parentRelationComponentScope
@@ -256,7 +259,7 @@ function RelationListModal({
       : ctx.id;
   const model = ctx.model;
 
-  const { data: parentRelationSelectedData } = useFetch({
+  const { data: parentRelationSelectedData, status } = useFetch({
     key: [
       'parent-relation-selected',
       ctx.model,
@@ -266,11 +269,12 @@ function RelationListModal({
       parentRelationNameProp,
       initParamsRef.current,
     ],
-    url: getSelectedRelationUrl({
-      relationPath: parentRelationPath,
+    url: getRelationUrl({
       id,
       model,
-      relationName: parentRelationName,
+      parentRelationName,
+      relationPath: parentRelationPath,
+      defaultPath: '/content-manager/relations/{MODEL}/{ID}/{PARENT_RELATION_NAME}',
     }),
     config: {
       params: {
@@ -287,6 +291,13 @@ function RelationListModal({
     (parentRelationField?.disconnect?.[0]
       ? undefined
       : parentRelationSelectedData?.results?.[0]?.id);
+
+  if (status === 'pending' && !!parentRelationNameProp && !!id) {
+    return formatMessage({
+      id: 'settings.loading',
+      defaultMessage: 'Loading...',
+    });
+  }
 
   return (
     <Modal.Root
@@ -368,10 +379,13 @@ function RelationListContent(props: RelationListProps) {
     select_relation_path: selectRelationPath,
     relation_type: relationType,
     relation_component_scope: relationComponentScope,
+    parent_relation_name: parentRelationNameProp,
+    select_relation_strict: selectRelationStrict,
   } = attribute.options;
   const toOneRelation = relationType === 'single';
 
   const { formatMessage } = useIntl();
+  const { toggleNotification } = useNotification();
   const ctx = useContentManagerContext();
   const fullFields = useField(''); // lấy tất cả form fields
 
@@ -379,14 +393,17 @@ function RelationListContent(props: RelationListProps) {
   const [page, setPage] = React.useState(1);
 
   /** Kết xuất relation name */
-  const { fullRelationField, relationName } = React.useMemo(() => {
+  const { fullRelationField, relationName, parentRelationName } = React.useMemo(() => {
     const nameArr = getNameByRelationName(props.name) ?? [];
     const [c_relationName] = nameArr.slice(-1);
+
+    let parentRelationNameArr = getNameByRelationName(parentRelationNameProp) ?? [];
+    const [parentRelationName] = parentRelationNameArr.slice(-1);
 
     let relationNameArr = getNameByRelationName(relationNameProp) ?? [];
     const [relationName] = relationNameArr.slice(-1);
 
-    nameArr?.forEach((key, index) => {
+    nameArr.forEach((key, index) => {
       if (c_relationName === key) return;
 
       if (relationNameArr[index] && relationNameArr[index] !== relationName) {
@@ -406,10 +423,11 @@ function RelationListContent(props: RelationListProps) {
     return {
       relationName,
       fullRelationField,
+      parentRelationName,
     };
   }, [props, fullFields?.value]);
 
-  const relationField = fullRelationField[relationName];
+  const relationField = fullRelationField?.[relationName];
   const id = fullRelationField?.id ? fullRelationField.id : relationComponentScope ? '' : ctx.id;
   const model = ctx.model;
 
@@ -417,7 +435,9 @@ function RelationListContent(props: RelationListProps) {
   const initParams = React.useMemo(() => {
     if (!_initParams) return {};
 
-    const str = _initParams.replace(
+    let str = _initParams.replace('{PARENT_RELATION_NAME}', parentRelationName);
+
+    str = str.replace(
       '{PARENT_RELATION_ID}',
       parentRelationId ? String(parentRelationId) : 'undefined'
     );
@@ -428,7 +448,20 @@ function RelationListContent(props: RelationListProps) {
         return str;
       },
     });
-  }, [parentRelationId, _initParams]);
+  }, [parentRelationId, _initParams, parentRelationName]);
+
+  // Cảnh báo nếu sử dụng strict
+  React.useEffect(() => {
+    if (selectRelationStrict && !parentRelationId) {
+      toggleNotification({
+        message: formatMessage({
+          id: 'settings.use-strict',
+          defaultMessage: 'Please select the relationship field first',
+        }),
+        type: 'info',
+      });
+    }
+  }, [parentRelationId]);
 
   const { data, status, error } = useFetch<{
     pagination: Pagination;
@@ -445,7 +478,12 @@ function RelationListContent(props: RelationListProps) {
       initParams,
       relationField,
     ],
-    url: getSelectRelationUrl({ relationPath, model, relationName }),
+    url: getRelationUrl({
+      relationPath,
+      model,
+      relationName,
+      defaultPath: '/content-manager/relations/{MODEL}/{RELATION_NAME}',
+    }),
     config: {
       params: {
         id,
@@ -460,6 +498,7 @@ function RelationListContent(props: RelationListProps) {
     cache: {
       ttl: 0,
     },
+    initialEnabled: selectRelationStrict ? !!parentRelationId : true,
   });
 
   const handleCheckedChange = React.useCallback(
@@ -496,7 +535,12 @@ function RelationListContent(props: RelationListProps) {
         <SearchInput search={search} onSearchChange={setSearch} />
       </Box>
 
-      {status === 'pending' ? (
+      {selectRelationStrict && !parentRelationId ? (
+        formatMessage({
+          id: 'settings.use-strict',
+          defaultMessage: 'Please select the relationship field first',
+        })
+      ) : status === 'pending' ? (
         formatMessage({
           id: 'settings.loading',
           defaultMessage: 'Loading...',

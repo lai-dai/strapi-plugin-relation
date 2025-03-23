@@ -6,5 +6,6 @@
   "search-input-placeholder": "Tìm kiếm",
   "settings.data-empty": "Không tìm thấy dữ liệu",
   "settings.loading": "Đang tải",
-  "settings.error": "Lỗi"
+  "settings.error": "Lỗi",
+  "setting.use-strict": "Vui lòng chọn trường quan hệ trước"
 }

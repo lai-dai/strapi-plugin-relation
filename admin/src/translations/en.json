@@ -6,5 +6,6 @@
   "settings.search-input-placeholder": "Search",
   "settings.data-empty": "Empty Data",
   "settings.loading": "Loading",
-  "settings.error": "Error"
+  "settings.error": "Error",
+  "setting.use-strict": "Please select the relationship field first"
 }

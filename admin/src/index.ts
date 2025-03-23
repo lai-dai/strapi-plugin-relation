@@ -126,22 +126,6 @@ export default {
           {
             intlLabel: {
               id: getTranslation('settings.title'),
-              defaultMessage: 'Relation in Component',
-            },
-            name: 'options.relation_component_scope',
-            type: 'checkbox',
-          },
-          {
-            intlLabel: {
-              id: getTranslation('settings.title'),
-              defaultMessage: 'Parent Relation in Component',
-            },
-            name: 'options.parent_relation_component_scope',
-            type: 'checkbox',
-          },
-          {
-            intlLabel: {
-              id: getTranslation('settings.title'),
               defaultMessage: 'Parent Relation Name',
             },
             name: 'options.parent_relation_name',
@@ -154,6 +138,30 @@ export default {
             },
             name: 'options.selected_parent_relation_path',
             type: 'text',
+          },
+          {
+            intlLabel: {
+              id: getTranslation('settings.title'),
+              defaultMessage: 'Relation Component Scope',
+            },
+            name: 'options.relation_component_scope',
+            type: 'checkbox',
+          },
+          {
+            intlLabel: {
+              id: getTranslation('settings.title'),
+              defaultMessage: 'Parent Relation Component Scope',
+            },
+            name: 'options.parent_relation_component_scope',
+            type: 'checkbox',
+          },
+          {
+            intlLabel: {
+              id: getTranslation('settings.title'),
+              defaultMessage: 'Select Relation Use Strict',
+            },
+            name: 'options.select_relation_strict',
+            type: 'checkbox',
           },
         ],
       },
