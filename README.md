@@ -10,22 +10,46 @@ Demo (đang cập nhật)
 
 ### Relation name (yêu cầu)
 
-DYNAMIC ZONE & COMPONENT SINGLE & COMPONENT REPEATABLE (is same)
+#### DYNAMIC ZONE || COMPONENT REPEATABLE (is same)
 
 ```
 Level 1
-{DYNAMIC1}.{INDEX1}.articles
+{DYNAMIC1}.{INDEX1}.category
 
 Level 2
-{DYNAMIC1}.{INDEX1}.{DYNAMIC2}.{INDEX2}.articles
+{DYNAMIC1}.{INDEX1}.{DYNAMIC2}.{INDEX2}.category
 
 or
 
 Level 1
-{COMPONENT1}.{INDEX1}.articles
+{COMPONENT1}.{INDEX1}.category
 
 Level 2
-{COMPONENT1}.{INDEX1}.{COMPONENT2}.{INDEX2}.articles
+{COMPONENT1}.{INDEX1}.{COMPONENT2}.{INDEX2}.category
+```
+
+#### COMPONENT REPEATABLE with COMPONENT SINGLE
+
+```
+Level 2
+{COMPONENT1}.{INDEX1}.{COMPONENT2}.category
+```
+
+#### COMPONENT SINGLE
+
+```
+Level 1
+{COMPONENT1}.category
+
+Level 2
+{COMPONENT1}.{COMPONENT2}.category
+```
+
+#### COMPONENT SINGLE with COMPONENT REPEATABLE
+
+```
+Level 2
+{COMPONENT1}.{COMPONENT3}.{INDEX1}.category
 ```
 
 Checked by Regex :`relationName.match(/\w+|\d+/g)`

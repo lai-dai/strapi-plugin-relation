@@ -286,11 +286,11 @@ function RelationListModal({
     initialEnabled: !!parentRelationNameProp && !!id,
   });
 
-  const parentRelationId =
-    parentRelationField?.connect?.[0]?.id ??
-    (parentRelationField?.disconnect?.[0]
+  const parentRelationId = parentRelationField?.connect?.[0]?.id
+    ? parentRelationField?.connect?.[0]?.id
+    : parentRelationField?.disconnect?.[0]?.id
       ? undefined
-      : parentRelationSelectedData?.results?.[0]?.id);
+      : parentRelationSelectedData?.results?.[0]?.id;
 
   if (status === 'pending' && !!parentRelationNameProp && !!id) {
     return formatMessage({
@@ -634,19 +634,20 @@ export const Entry = styled.div`
     gap: 9px;
     align-items: start;
     border: 1px solid #ccc;
-    padding: 9px;
     border-radius: 6px;
     cursor: pointer;
+    padding-left: 9px;
 
     &:hover {
       background-color: #f0f0ff;
     }
 
     > button {
-      margin-top: 4px;
+      margin-top: 13px;
     }
 
     > label {
+      padding: 9px;
       flex-grow: 1;
       display: flex;
       gap: 6px;
