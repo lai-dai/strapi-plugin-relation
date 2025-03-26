@@ -34,7 +34,34 @@ export const ChooseRelationField = (props: RelationFieldProps) => {
 };
 
 const RelationField = (props: RelationFieldProps) => {
-  const { label, required, hint, error, attribute } = props;
+  const ctx = useContentManagerContext();
+  const model = ctx.model;
+
+  const { formatMessage } = useIntl();
+
+  const { data: singleTypesData, status } = useFetch({
+    key: ['relation-selected', model, ctx.isSingleType],
+    url: getRelationUrl({
+      model,
+      defaultPath: '/content-manager/single-types/{MODEL}',
+    }),
+    initialEnabled: ctx.isSingleType,
+  });
+
+  if (ctx.isSingleType && status === 'loading') {
+    return formatMessage({
+      id: 'settings.loading',
+      defaultMessage: 'Loading...',
+    });
+  }
+
+  const documentId = singleTypesData?.data?.documentId ?? ctx.id;
+
+  return <_RelationField {...props} documentId={documentId} />;
+};
+
+const _RelationField = (props: RelationFieldProps & { documentId: string | number }) => {
+  const { label, required, hint, error, attribute, documentId } = props;
   const {
     relation_name: relationNameProp,
     relation_hidden: relationHidden,
@@ -99,7 +126,11 @@ const RelationField = (props: RelationFieldProps) => {
   }, [relationHidden]);
 
   const relationField = fullRelationField?.[relationName];
-  const id = fullRelationField?.id ? fullRelationField.id : relationComponentScope ? '' : ctx.id;
+  const id = fullRelationField?.id
+    ? fullRelationField.id
+    : relationComponentScope
+      ? ''
+      : documentId;
   const model = ctx.model;
 
   const [relationPath, initParams] = selectedRelationPathProp?.split('?') ?? [];
@@ -200,7 +231,9 @@ function RelationListModal({
   ...props
 }: RelationFieldProps & {
   onSubmit?: (relations: RelationConnects[]) => void;
+  documentId: string | number;
 }) {
+  const { documentId } = props;
   const {
     parent_relation_name: parentRelationNameProp,
     selected_parent_relation_path: selectedParentRelationPathProp,
@@ -256,14 +289,14 @@ function RelationListModal({
     ? fullParentRelationField.id
     : parentRelationComponentScope
       ? ''
-      : ctx.id;
+      : documentId;
   const model = ctx.model;
 
   const { data: parentRelationSelectedData, status } = useFetch({
     key: [
       'parent-relation-selected',
-      ctx.model,
-      ctx.id,
+      model,
+      id,
       parentRelationPath,
       parentRelationName,
       parentRelationNameProp,
@@ -369,10 +402,11 @@ interface RelationListProps extends RelationFieldProps {
   relationConnects: RelationConnects[];
   setRelationConnect: (value: RelationConnects[]) => void;
   parentRelationId?: number;
+  documentId: string | number;
 }
 
 function RelationListContent(props: RelationListProps) {
-  const { attribute, setRelationConnect, relationConnects, parentRelationId } = props;
+  const { attribute, setRelationConnect, relationConnects, parentRelationId, documentId } = props;
   const {
     relation_name: relationNameProp,
     relation_main_field: mainField,
@@ -428,7 +462,11 @@ function RelationListContent(props: RelationListProps) {
   }, [props, fullFields?.value]);
 
   const relationField = fullRelationField?.[relationName];
-  const id = fullRelationField?.id ? fullRelationField.id : relationComponentScope ? '' : ctx.id;
+  const id = fullRelationField?.id
+    ? fullRelationField.id
+    : relationComponentScope
+      ? ''
+      : documentId;
   const model = ctx.model;
 
   const [relationPath, _initParams] = selectRelationPath?.split('?') ?? [];
